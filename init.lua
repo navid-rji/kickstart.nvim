@@ -933,7 +933,7 @@ require('lazy').setup({
     opts = {
       filesystem = {
         filtered_items = {
-          visible = true,
+          visible = false, -- hide filtered files (see below)
           hide_dotfiles = false,
           hide_gitignored = false,
           hide_by_name = {
