@@ -157,7 +157,57 @@ vim.o.inccommand = 'split'
 vim.o.cursorline = true
 
 -- Minimal number of screen lines to keep above and below the cursor.
-vim.o.scrolloff = 8
+-- vim.o.scrolloff = 8
+
+-- GLobal default indentation
+vim.o.expandtab = true -- insert spaces when pressing Tab
+vim.o.tabstop = 4 -- nmuber of columns when displaying \t
+vim.o.shiftwidth = 4 -- how many spaces for indentation commands like >> and << and ==
+vim.o.softtabstop = 4 -- how many spaces are inserted when pressing Tab
+
+-- Language-specific indentation
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = {
+    'lua',
+    'javascript',
+    'typescript',
+    'javascriptreact',
+    'typescriptreact',
+    'html',
+    'css',
+    'json',
+    'yaml',
+    'markdown',
+    'ocaml',
+    'reason',
+  },
+  callback = function()
+    vim.opt_local.expandtab = true
+    vim.opt_local.tabstop = 2
+    vim.opt_local.shiftwidth = 2
+    vim.opt_local.softtabstop = 2
+  end,
+})
+
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'python', 'rust', 'c', 'cpp', 'tex' },
+  callback = function()
+    vim.opt_local.expandtab = true
+    vim.opt_local.tabstop = 4
+    vim.opt_local.shiftwidth = 4
+    vim.opt_local.softtabstop = 4
+  end,
+})
+
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'go' },
+  callback = function()
+    vim.opt_local.expandtab = false
+    vim.opt_local.tabstop = 4
+    vim.opt_local.shiftwidth = 4
+    vim.opt_local.softtabstop = 4
+  end,
+})
 
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
@@ -220,6 +270,14 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
+
+-- OCaml sanity check
+vim.api.nvim_create_user_command('OCamlCheck', function()
+  print('ocaml:      ' .. vim.fn.exepath 'ocaml')
+  print('ocamllsp:   ' .. vim.fn.exepath 'ocamllsp')
+  print('ocamlformat:' .. vim.fn.exepath 'ocamlformat')
+  print('dune:       ' .. vim.fn.exepath 'dune')
+end, {})
 
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
@@ -605,6 +663,27 @@ require('lazy').setup({
         pyright = {},
         ruff = {},
         rust_analyzer = {},
+        texlab = {
+          settings = {
+            texlab = {
+              build = {
+                executable = 'latexmk',
+                args = {
+                  '-pdf',
+                  '-interaction=nonstopmode',
+                  '-synctex=1',
+                  '%f',
+                },
+                onSave = true,
+                forwardSearchAfter = false,
+              },
+              forwardSearch = {
+                executable = '/Applications/Skim.app/Contents/SharedSupport/displayline',
+                args = { '-r', '%l', '%p', '%f' },
+              },
+            },
+          },
+        },
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
         --    https://github.com/pmizio/typescript-tools.nvim
@@ -645,6 +724,27 @@ require('lazy').setup({
           },
         },
       }
+
+      -- OCaml: use the ocamllsp installed by opam, not Maso
+      vim.lsp.config('ocamllsp', {
+        cmd = { 'ocamllsp' },
+        filetypes = {
+          'ocaml',
+          'ocaml.interface',
+          'ocaml.menhir',
+          'ocaml.ocamllex',
+          'dune',
+          'reason',
+        },
+        root_markers = {
+          { 'dune-project', 'dune-workspace' },
+          { '*.opam', 'esy.json', 'package.json' },
+          '.git',
+        },
+        settings = {},
+      })
+
+      vim.lsp.enable 'ocamllsp'
 
       -- Ensure the servers and tools above are installed
       --
@@ -704,6 +804,9 @@ require('lazy').setup({
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        ocaml = { 'ocamlformat' },
+        ['ocaml.interface'] = { 'ocamlformat' },
+        reason = { 'ocamlformat' },
       },
     },
   },
@@ -877,7 +980,7 @@ require('lazy').setup({
     branch = 'main',
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter-intro`
     config = function()
-      local parsers = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' }
+      local parsers = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'ocaml', 'ocaml_interface' }
       require('nvim-treesitter').install(parsers)
       vim.api.nvim_create_autocmd('FileType', {
         callback = function(args)
@@ -930,6 +1033,9 @@ require('lazy').setup({
       'MunifTanjim/nui.nvim',
       'nvim-tree/nvim-web-devicons', -- optional, but recommended
     },
+    keys = {
+      { '<leader>e', '<cmd>Neotree toggle<cr>', desc = 'Toggle [E]xplorer' },
+    },
     opts = {
       filesystem = {
         filtered_items = {
@@ -946,6 +1052,55 @@ require('lazy').setup({
       },
     },
   },
+  {
+    'lervag/vimtex',
+    lazy = false, -- we don't want to lazy load VimTeX
+    init = function()
+      -- VimTeX configuration goes here, e.g.
+      vim.g.vimtex_view_method = 'skim'
+      vim.g.vimtex_compiler_method = 'latexmk'
+    end,
+  },
+  {
+    'kdheepak/lazygit.nvim',
+    lazy = true,
+    cmd = {
+      'LazyGit',
+      'LazyGitConfig',
+      'LazyGitCurrentFile',
+      'LazyGitFilter',
+      'LazyGitFilterCurrentFile',
+    },
+    -- optional for floating window border decoration
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+    },
+    -- setting the keybinding for LazyGit with 'keys' is recommended in
+    -- order to load the plugin when the command is run for the first time
+    keys = {
+      { '<leader>lg', '<cmd>LazyGit<cr>', desc = 'LazyGit' },
+    },
+  },
+  {
+    'shortcuts/no-neck-pain.nvim',
+    opts = {
+      width = 120,
+    },
+  },
+  {
+    'navid-rji/better-scrolloff.nvim',
+    opts = {
+      top = 2,
+      bottom = '75%',
+    },
+  },
+  -- {
+  --   dir = '~/Developer/better-scrolloff.nvim',
+  --   opts = {
+  --     top = 2,
+  --     bottom = '75%',
+  --   },
+  -- },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
